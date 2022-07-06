@@ -1,9 +1,12 @@
 import json
+import sys
+import os
 
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
 with open('secrets.json', 'r') as f:
     secrets = json.load(f)
@@ -24,8 +27,8 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     # project apps
-    'apps.client_api',
-    'apps.specialist_api',
+    'client_api',
+    'specialist_api',
     
     # third-party apps
     'rest_framework',
@@ -113,7 +116,7 @@ TIME_ZONE = 'Europe/Kiev'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
