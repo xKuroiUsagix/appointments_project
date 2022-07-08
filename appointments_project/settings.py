@@ -8,7 +8,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
-with open('secrets.json', 'r') as f:
+with open(BASE_DIR / 'secrets.json', 'r') as f:
     secrets = json.load(f)
 
 # Quick-start development settings - unsuitable for production
@@ -29,9 +29,21 @@ INSTALLED_APPS = [
     # project apps
     'client_api',
     'specialist_api',
+    'wagtail_admin',
     
     # third-party apps
     'rest_framework',
+
+    'wagtail.users',
+    'wagtail.documents',
+    'wagtail.images',
+    'wagtail.search',
+    'wagtail.contrib.modeladmin',
+    'wagtail.admin',
+    'wagtail',
+    
+    'modelcluster',
+    'taggit',
     
     # django apps
     'django.contrib.admin',
@@ -42,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
-MIDDLEWARE = [
+MIDDLEWARE = [    
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -123,11 +135,14 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'static'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = 'media/'
+
+WAGTAIL_SITE_NAME = 'Appointments Site'
