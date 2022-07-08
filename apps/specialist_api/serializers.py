@@ -1,4 +1,3 @@
-from pkg_resources import require
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
@@ -38,6 +37,11 @@ class ScheduleSerializer(ModelSerializer):
         fields = '__all__'
         
     def validate(self, data):
+        try:
+            self.model.validate_timevalue(data['start_time'])
+            self.model.validate_timevalue(data['end_time'])
+        except ValueError as e:
+            raise serializers.ValidationError(e)
         if (self.model.is_location_free(data['location'],
                                         data['day_of_week'],
                                         data['start_time'],
