@@ -1,4 +1,5 @@
 from django.db import models
+from django.forms import ValidationError
 from django.utils.timezone import datetime
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
@@ -6,12 +7,44 @@ from django.utils.translation import gettext_lazy as _
 import calendar
 from datetime import timedelta, time, date
 
+from wagtail.admin.forms import WagtailAdminModelForm
 from client_api.models import Client
 
 
 User = get_user_model()
 
-    
+
+class ScheduleAdminForm(WagtailAdminModelForm):
+    def clean(self):
+        data = self.cleaned_data
+
+        try:
+            Schedule.validate_timevalue(data['_start_time'])
+            Schedule.validate_timevalue(data['_end_time'])
+        except ValueError as e:
+            raise ValidationError(e)
+        
+        if not Schedule.is_location_free(data['location'],
+                                         data['day_of_week'],
+                                         data['_start_time'],
+                                         data['_end_time']):
+            raise ValidationError('Location is not free at that time.')
+        
+        return data
+
+
+class AppointmentAdminForm(WagtailAdminModelForm):
+    def clean(self):
+        data = self.cleaned_data
+        
+        if not Appointment.is_apoointment_avaliable(data['worker'],
+                                                    data['scheduled_for'],
+                                                    data['service']):
+            raise ValidationError('Appointment is not avaliable at that time.')
+        
+        return data
+
+
 class Location(models.Model):
     """
     A model for storing data about location.
@@ -43,24 +76,24 @@ class Service(models.Model):
     name = models.CharField(max_length=128)
     price = models.PositiveIntegerField()
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES)
-    _seconds_length = models.FloatField(verbose_name='seconds length')
+    _seconds_length = models.FloatField(verbose_name='length')
     
     class Meta:
         db_table = 'service'
     
     def __str__(self):
-        return f'{self.name} | {self.price} {self.currency} | {self.seconds_length}'
+        return f'{self.name}'
     
     @property
-    def seconds_length(self):
+    def length(self):
         return self._seconds_length
     
-    @seconds_length.getter
-    def seconds_length(self):
+    @length.getter
+    def length(self):
         return timedelta(seconds=self._seconds_length)
     
-    @seconds_length.setter
-    def seconds_length(self, value:timedelta):
+    @length.setter
+    def length(self, value:timedelta):
         """
         A setter which converts given timedelta value to seconds.
         """
@@ -98,6 +131,7 @@ class Schedule(models.Model):
     """
     A model for storing data about worker's schedule for concrete day of week
     """
+    base_form_class = ScheduleAdminForm
     DAYS_OF_WEEK_CHOICES = (
         (calendar.MONDAY, _('Monday')),
         (calendar.TUESDAY, _('Tuesday')),
@@ -137,7 +171,8 @@ class Schedule(models.Model):
         self.validate_timevalue(value)
         self._end_time = value
 
-    def validate_timevalue(self, value:time):
+    @staticmethod
+    def validate_timevalue(value:time):
         """
         A method for time setters validation.
         This method checks if an instance of given value is time...
@@ -171,6 +206,7 @@ class Appointment(models.Model):
     """
     A model for sotring data about clients appointments.
     """
+    base_form_class = AppointmentAdminForm
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
     worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
@@ -192,9 +228,9 @@ class Appointment(models.Model):
         for appointment in appointments:
             current_service_start = appointment.scheduled_for
             current_service_end = (datetime.combine(date.min, appointment.scheduled_for.time())
-                                   + appointment.service.seconds_length)
+                                   + appointment.service.length)
             given_service_end = (datetime.combine(date.min, scheduled_for.time())
-                                 + service.seconds_length)
+                                 + service.length)
 
             # Checking if given appointment placed inside other existing appointment
             if (current_service_start.time() <= scheduled_for.time() <= current_service_end.time() or
@@ -213,11 +249,10 @@ class Appointment(models.Model):
         """
         schedules = Schedule.objects.filter(worker=worker, day_of_week=scheduled_for.weekday())
         service_end = (datetime.combine(date.min, scheduled_for.time())
-                       + service.seconds_length)
+                       + service.length)
         
         for schedule in schedules:
             # Checking if scheduled_for and service_end inside worker's schedule
-            print(service_end.time(), schedule.end_time)
             if (schedule.start_time <= scheduled_for.time() <= schedule.end_time and
                     service_end.time() <= schedule.end_time):
                 return Appointment._is_worker_avaliable(worker, scheduled_for, service)

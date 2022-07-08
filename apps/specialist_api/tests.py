@@ -121,7 +121,7 @@ class AppointmentModelTests(TestCase):
             name='service_name',
             price=120,
             currency='USD',
-            seconds_length=service_length
+            length=service_length
         )
         self.worker.services.add(self.service)
         
