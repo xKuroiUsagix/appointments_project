@@ -1,61 +1,29 @@
+import calendar
+from datetime import time, date
+
 from django.db import models
-from django.forms import ValidationError
 from django.utils.timezone import datetime
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
-import calendar
-from datetime import timedelta, time, date
-
-from wagtail.admin.forms import WagtailAdminModelForm
-from client_api.models import Client
+from appointments_project import settings
+from wagtail_admin.forms import ScheduleAdminForm, AppointmentAdminForm
 
 
-User = get_user_model()
-
-
-class ScheduleAdminForm(WagtailAdminModelForm):
-    def clean(self):
-        data = self.cleaned_data
-
-        try:
-            Schedule.validate_timevalue(data['_start_time'])
-            Schedule.validate_timevalue(data['_end_time'])
-        except ValueError as e:
-            raise ValidationError(e)
-        
-        if not Schedule.is_location_free(data['location'],
-                                         data['day_of_week'],
-                                         data['_start_time'],
-                                         data['_end_time']):
-            raise ValidationError('Location is not free at that time.')
-        
-        return data
-
-
-class AppointmentAdminForm(WagtailAdminModelForm):
-    def clean(self):
-        data = self.cleaned_data
-        
-        if not Appointment.is_apoointment_avaliable(data['worker'],
-                                                    data['scheduled_for'],
-                                                    data['service']):
-            raise ValidationError('Appointment is not avaliable at that time.')
-        
-        return data
+User = settings.AUTH_USER_MODEL
 
 
 class Location(models.Model):
     """
-    A model for storing data about location.
+    Stores a single location entry.
     """
-    city = models.CharField(max_length=128)
+    city = models.CharField(max_length=128, db_index=True)
     street = models.CharField(max_length=128)
     street_number = models.CharField(max_length=64)
     appartment_address = models.CharField(max_length=64, null=True, blank=True)
     
     class Meta:
         db_table = 'location'
+        ordering = ['city']
     
     def __str__(self):
         return f'{self.city}, {self.street}, {self.street_number}, {self.appartment_address}'
@@ -63,62 +31,65 @@ class Location(models.Model):
 
 class Service(models.Model):
     """
-    A model for storing data about services which Worker can provide.
+    Stores a single service entry.
     """
-    CURRENCY_CHOICES = (
-        ('USD', _('United States Dollar')),
-        ('EUR', _('Euro')),
-        ('GBP', _('Great Britain Pound')),
-        ('JPY', _('Japanese Yen')),
-        ('CNY', _('Chinese Yuan')),
-        ('UAH', _('Ukrainian Hryvnia'))
-    )
-    name = models.CharField(max_length=128)
+    UNITED_STATES_DOLLAR = 'USD'
+    EURO = 'EUR'
+    GREATE_BRITAIN_POUND = 'GBP'
+    JAPANESE_YEN = 'JPY'
+    CHINESE_YUAN = 'CNY'
+    UKRANIAN_HRYVNIA = 'UAH'
+    CURRENCY_CHOICES = [
+        (UNITED_STATES_DOLLAR, _('United States Dollar')),
+        (EURO, _('Euro')),
+        (GREATE_BRITAIN_POUND, _('Great Britain Pound')),
+        (JAPANESE_YEN, _('Japanese Yen')),
+        (CHINESE_YUAN, _('Chinese Yuan')),
+        (UKRANIAN_HRYVNIA, _('Ukrainian Hryvnia'))
+    ]
+    name = models.CharField(max_length=128, unique=True, db_index=True)
     price = models.PositiveIntegerField()
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES)
-    _seconds_length = models.FloatField(verbose_name='length')
+    length = models.DurationField()
     
     class Meta:
         db_table = 'service'
     
     def __str__(self):
         return f'{self.name}'
-    
-    @property
-    def length(self):
-        return self._seconds_length
-    
-    @length.getter
-    def length(self):
-        return timedelta(seconds=self._seconds_length)
-    
-    @length.setter
-    def length(self, value:timedelta):
-        """
-        A setter which converts given timedelta value to seconds.
-        """
-        self._seconds_length = value.total_seconds()
 
 
 class Worker(models.Model):
     """
-    A model for storing data about worker.
+    Stores a single worker entry, related to :model: `specialist_api.Service` through
+    :model: `specialsit_api.WorkerService`, :model: `specialist_api.Location` through
+    `specialist_api.Schedules` and :model: `specialist_api.User` as worker profile.
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='worker')
-    work_schedule = models.ManyToManyField(Location, through='Schedule')
-    services = models.ManyToManyField(Service, through='WorkerService')
-    appointments = models.ManyToManyField(Client, through='Appointment')
+    profile = models.OneToOneField(User, on_delete=models.CASCADE, related_name='worker_profile')
+    services = models.ManyToManyField(Service, through='WorkerService', blank=True)
+    schedules = models.ManyToManyField(Location, through='Schedule', blank=True)
+    appointments = models.ManyToManyField(User, through='Appointment', blank=True)
+    proffession = models.CharField(max_length=128)
     
     class Meta:
         db_table = 'worker'
     
     def __str__(self):
-        return f'{self.user.first_name} {self.user.last_name}'
+        return str(self.profile)
+    
+    def get_worker_schedule(self):
+        """:returns: schedule of the worker."""
+        return Schedule.objects.filter(worker=self)
+    
+    def get_worker_services(self):
+        """:returns: services which worker provides."""
+        return Service.objects.filter(worker=self)
 
 
 class WorkerService(models.Model):
     """
-    A model for storing data about workers and services which they can provide.
+    Stores relations between :model: `specialist_api.Worker` and
+    :model: `specialist_api.Service`
     """
     worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
@@ -129,9 +100,9 @@ class WorkerService(models.Model):
 
 class Schedule(models.Model):
     """
-    A model for storing data about worker's schedule for concrete day of week
+    Stores a single day schedule, which related to :model: `specialsit_api.Worker` and
+    :model: `specialist_api.Location`, where worker provides their services.
     """
-    base_form_class = ScheduleAdminForm
     DAYS_OF_WEEK_CHOICES = (
         (calendar.MONDAY, _('Monday')),
         (calendar.TUESDAY, _('Tuesday')),
@@ -146,6 +117,8 @@ class Schedule(models.Model):
     day_of_week = models.SmallIntegerField(choices=DAYS_OF_WEEK_CHOICES)
     _start_time = models.TimeField(verbose_name='start time')
     _end_time = models.TimeField(verbose_name='end time')
+    
+    base_form_class = ScheduleAdminForm
 
     class Meta:
         db_table = 'schedule'
@@ -174,24 +147,22 @@ class Schedule(models.Model):
     @staticmethod
     def validate_timevalue(value:time):
         """
-        A method for time setters validation.
-        This method checks if an instance of given value is time...
-        if first check is True, then checks if given value represents...
-        not more than 24 hours.
-        Raises ValueError if any check is failed.
+        Validates given time value and :raise: ValueError if validation fails.
+        :returns: True if exceptions haven't been raised.
         """
         if not isinstance(value, time):
             raise ValueError('value must be an instance of class time')
         if not (0 < value.hour < 24):
             raise ValueError('value must be between 0 and 24 hours')
+        
+        return True
     
     @staticmethod
-    def is_location_free(location, day_of_week, start_time:time, end_time:time):
+    def is_location_free(location, day_of_week: int, start_time:time, end_time:time):
         """
-        A method for comparing given period of time (start_time, end_time) 
-        for concrete day of a week with existing schedule.
-        
-        Returns: True if given period doesn't intersect with any other, else False.
+        Method says is given location is free at given day_of_week at given
+        start and end time.
+        :returns: True if location is free, else False.
         """
         schedule_for_day = Schedule.objects.filter(
             location=location,
@@ -204,56 +175,76 @@ class Schedule(models.Model):
 
 class Appointment(models.Model):
     """
-    A model for sotring data about clients appointments.
+    Stores a single appointment for :model: `specialist_api.CustomUser`,
+    related to :model: `specialist_api.Worker` and :model: `specialist_api.Service`.
     """
-    base_form_class = AppointmentAdminForm
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    client = models.ForeignKey(User, on_delete=models.CASCADE)
     worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     scheduled_for = models.DateTimeField()
     
+    base_form_class = AppointmentAdminForm
+    
     class Meta:
         db_table = 'appointment'
+        ordering = ['-scheduled_for']
     
     def __str__(self):
         return f'{self.client} appointed to {self.worker} on {self.scheduled_for} for {self.service} service length.'
     
     @staticmethod
-    def _is_worker_avaliable(worker, scheduled_for, service):
+    def _has_free_place(worker, scheduled_for, service):
         """
-        A static method for checking if a worker can provide given service for a client at given time.
+        Method says is the worker has free space in their schedule
+        to provide given service, depending on existing appointments.
+        :returns: True if there is free space, else False.
         """
-        appointments = Appointment.objects.filter(worker=worker)
+        appointments = Appointment.objects.filter(worker=worker, scheduled_for__date=scheduled_for.date())
         
         for appointment in appointments:
-            current_service_start = appointment.scheduled_for
+            current_service_start = appointment.scheduled_for.time()
             current_service_end = (datetime.combine(date.min, appointment.scheduled_for.time())
-                                   + appointment.service.length)
+                                   + appointment.service.length).time()
             given_service_end = (datetime.combine(date.min, scheduled_for.time())
-                                 + service.length)
-
+                                 + service.length).time()
+            
             # Checking if given appointment placed inside other existing appointment
-            if (current_service_start.time() <= scheduled_for.time() <= current_service_end.time() or
+            if (current_service_start <= scheduled_for.time() <= current_service_end or
                     current_service_start <= given_service_end <= current_service_end):
                 return False
             # Checking if existing appointment placed inside given appointment
             if (scheduled_for.time() <= current_service_start and
                     given_service_end > current_service_start):
                 return False
+
         return True
+    
+    @staticmethod
+    def _is_in_schedule(worker, scheduled_for, service):
+        """
+        Method says is worker works at given datetime and is
+        given service can be provided without overflowing from schedule.
+        :returns: True if statements from earlier are statisfied, else False.
+        
+        This method doesn't check existing appointments.
+        """
+        schedules = Schedule.objects.filter(worker=worker, day_of_week=scheduled_for.weekday())
+        service_end = datetime.combine(date.min, scheduled_for.time()) + service.length
+        
+        for schedule in schedules:
+            if (schedule.start_time <= scheduled_for.time() <= schedule.end_time and
+                    service_end.time() <= schedule.end_time):
+                return True
+    
+        return False
     
     @staticmethod
     def is_apoointment_avaliable(worker, scheduled_for, service):
         """
-        A method for checking if client's appointment is avaliable.
+        Method says is the worker can provide given service at fiven date and time.
+        :returns: True if appointment is avaliable, else False.
         """
-        schedules = Schedule.objects.filter(worker=worker, day_of_week=scheduled_for.weekday())
-        service_end = (datetime.combine(date.min, scheduled_for.time())
-                       + service.length)
+        if not Appointment._is_in_schedule(worker, scheduled_for, service):
+            return False
         
-        for schedule in schedules:
-            # Checking if scheduled_for and service_end inside worker's schedule
-            if (schedule.start_time <= scheduled_for.time() <= schedule.end_time and
-                    service_end.time() <= schedule.end_time):
-                return Appointment._is_worker_avaliable(worker, scheduled_for, service)
-        return False
+        return Appointment._has_free_place(worker, scheduled_for, service)
