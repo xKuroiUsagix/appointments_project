@@ -113,8 +113,8 @@ class Schedule(models.Model):
         (calendar.SUNDAY, _('Sunday'))
     )
     location = models.ForeignKey(Location, on_delete=models.CASCADE)
-    worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
-    day_of_week = models.SmallIntegerField(choices=DAYS_OF_WEEK_CHOICES)
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, db_index=True)
+    day_of_week = models.SmallIntegerField(choices=DAYS_OF_WEEK_CHOICES, db_index=True)
     _start_time = models.TimeField(verbose_name='start time')
     _end_time = models.TimeField(verbose_name='end time')
     
@@ -178,8 +178,8 @@ class Appointment(models.Model):
     Stores a single appointment for :model: `specialist_api.CustomUser`,
     related to :model: `specialist_api.Worker` and :model: `specialist_api.Service`.
     """
-    client = models.ForeignKey(User, on_delete=models.CASCADE)
-    worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
+    client = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, db_index=True)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     scheduled_for = models.DateTimeField()
     
