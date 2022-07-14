@@ -44,7 +44,7 @@ class WorkerListAPIView(APIView):
     model = Worker
     serializer_class = WorkerSerializer
     
-    def get(self, request, *kwargs):
+    def get(self, request, **kwargs):
         try:
             queryset = self.filter_queryset(self.get_queryset())
         except ValueError as e:
