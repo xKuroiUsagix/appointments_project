@@ -1,16 +1,29 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.contrib.auth import get_user_model
+
+from .managers import UserManager
 
 
-User = get_user_model()
+ROLE_CHOICES = (
+    (0, 'common_user'),
+    (1, 'admin')
+)
 
 
-class Client(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client')
+class CustomUser(AbstractUser):
+    """
+    Stores a single user entry.
+    """
+    role = models.IntegerField(default=0, choices=ROLE_CHOICES)
+    
+    REQUIRED_FIELDS = [
+        'email',
+        'password',
+    ]
+    objects = UserManager()
     
     class Meta:
-        db_table = 'client'
+        db_table = 'custom_user'
     
     def __str__(self):
-        return f'{self.user.first_name} {self.user.last_name}'
+        return self.username
