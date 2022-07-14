@@ -13,13 +13,25 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView
+)
+from wagtail.admin import urls as wagtailadmin_urls
+
 from django.urls import path, include
 from django.conf.urls.static import static
 
 from . import settings
-from wagtail.admin import urls as wagtailadmin_urls
 
 
 urlpatterns = [
-    path('admin/', include(wagtailadmin_urls))
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('admin/', include(wagtailadmin_urls)),
+    path('api/specialist/', include('specialist_api.urls')),
+    path('api/client/', include('client_api.urls')),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh')
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

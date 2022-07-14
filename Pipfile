@@ -9,6 +9,8 @@ psycopg2 = "*"
 pillow = "*"
 djangorestframework = "*"
 wagtail = "*"
+djangorestframework-simplejwt = "*"
+docutils = "*"
 
 [dev-packages]
 
