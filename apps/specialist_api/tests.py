@@ -1,20 +1,22 @@
-from django.test import TestCase
-from django.utils import timezone
-from django.utils.timezone import datetime
-from django.contrib.auth import get_user_model
-
 import calendar
 from datetime import timedelta, time
 
-from client_api.models import Client
-from .models import Worker, Location, Schedule, Service, Appointment
+from django.test import TestCase
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+from .models import (
+    Worker, Location, Schedule, Service, Appointment
+)
 
 
 User = get_user_model()
-timezone.make_aware(datetime.now(), timezone.get_default_timezone())
 
 
 class ScheduleModelTests(TestCase):
+    """
+    Provides tests for :model: `specialist_api.Schedule`
+    """
     def setUp(self):
         user = User.objects.create_user(
             username='username',
@@ -23,7 +25,7 @@ class ScheduleModelTests(TestCase):
             first_name='name',
             last_name='surname'
         )
-        self.worker = Worker.objects.create(user=user)
+        self.worker = Worker.objects.create(profile=user)
         self.location = Location.objects.create(
             city='City',
             street='Street',
@@ -97,8 +99,11 @@ class ScheduleModelTests(TestCase):
 
 
 class AppointmentModelTests(TestCase):
+    """
+    Provides tests for :model: `specialist_api.Appointment`.
+    """
     def setUp(self):
-        client_user = User.objects.create_user(
+        self.client = User.objects.create_user(
             username='username1',
             email='testmail1@mail.com',
             password='testpass1',
@@ -113,8 +118,7 @@ class AppointmentModelTests(TestCase):
             last_name='worker_surname'
         )
         
-        self.client = Client.objects.create(user=client_user)
-        self.worker = Worker.objects.create(user=worker_user)
+        self.worker = Worker.objects.create(profile=worker_user)
         
         service_length = timedelta(minutes=40)
         self.service = Service.objects.create(
@@ -151,22 +155,24 @@ class AppointmentModelTests(TestCase):
         time_inside_schedule = timezone.datetime(year, month, day, self.start_time.hour)
         time_outside_schedule = timezone.datetime(year, month, day, self.start_time.hour - 1)
 
-        self.assertTrue(
+        self.assertIs(
             Appointment.is_apoointment_avaliable(
                 worker=self.worker,
                 service=self.service,
                 scheduled_for=time_inside_schedule
-            )
+            ),
+            True
         )
-        self.assertFalse(
+        self.assertIs(
             Appointment.is_apoointment_avaliable(
                 worker=self.worker,
                 service=self.service,
                 scheduled_for=time_outside_schedule
-            )
+            ),
+            False
         )
         
-        # testing when there is appointment
+        # testing when there is appointment already
         Appointment.objects.create(
             client=self.client,
             worker=self.worker,
@@ -174,12 +180,13 @@ class AppointmentModelTests(TestCase):
             scheduled_for=time_inside_schedule
         )
         
-        self.assertFalse(
+        self.assertIs(
             Appointment.is_apoointment_avaliable(
                 worker=self.worker,
                 service=self.service,
                 scheduled_for=time_inside_schedule
-            )
+            ),
+            False
         )
         
     
