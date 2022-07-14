@@ -3,12 +3,8 @@ from wagtail.contrib.modeladmin.options import (
 )
 
 from specialist_api.models import (
-    Location,
-    Service,
-    Worker,
-    WorkerService,
-    Schedule,
-    Appointment
+    Location, Service, Worker,
+    Schedule, Appointment
 )
 
 
@@ -28,16 +24,10 @@ class ServiceAdmin(ModelAdmin):
 
 class WorkerAdmin(ModelAdmin):
     model = Worker
+    form_fields_exclude = ('appointments', 'schedules')
     menu_label = 'Worker'
-    list_display = ('user',)
-    search_fields = ('user',)
-
-
-class WorkerServiceAdmin(ModelAdmin):
-    model = WorkerService
-    menu_label = 'Attach Services'
-    list_display = ('worker', 'service')
-    search_fields = ('worker', 'service')
+    list_display = ('profile',)
+    search_fields = ('profile',)
 
 
 class ScheduleAdmin(ModelAdmin):
@@ -56,6 +46,7 @@ class AppointmentAdmin(ModelAdmin):
 class Administartion(ModelAdminGroup):
     menu_label = 'Administration'
     menu_order = 000
-    items = (LocationAdmin, ServiceAdmin, WorkerAdmin, WorkerServiceAdmin, ScheduleAdmin, AppointmentAdmin)
+    items = (LocationAdmin, ServiceAdmin, WorkerAdmin, 
+             ScheduleAdmin, AppointmentAdmin)
 
 modeladmin_register(Administartion)
