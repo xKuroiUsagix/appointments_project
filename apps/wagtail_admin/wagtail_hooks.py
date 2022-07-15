@@ -18,7 +18,7 @@ class LocationAdmin(ModelAdmin):
 class ServiceAdmin(ModelAdmin):
     model = Service
     menu_label = 'Service'
-    list_display = ('name', 'price', 'currency', 'length')
+    list_display = ('name', 'price', 'currency', 'duration')
     search_fields = ('name',)
 
 
@@ -33,7 +33,7 @@ class WorkerAdmin(ModelAdmin):
 class ScheduleAdmin(ModelAdmin):
     model = Schedule
     menu_label = 'Schedule'
-    list_display = ('location', 'worker', 'day_of_week', '_start_time', '_end_time')
+    list_display = ('location', 'worker', 'day_of_week', 'start_time', 'end_time')
     search_fields = ('location', 'worker')
 
 
