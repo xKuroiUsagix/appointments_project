@@ -6,7 +6,9 @@ from django.utils.timezone import datetime
 from django.utils.translation import gettext_lazy as _
 
 from appointments_project import settings
-from wagtail_admin.forms import ScheduleAdminForm, AppointmentAdminForm
+from wagtail_admin.forms import (
+    ScheduleAdminForm, AppointmentAdminForm, ServiceAdminForm
+)
 
 
 User = settings.AUTH_USER_MODEL
@@ -50,7 +52,9 @@ class Service(models.Model):
     name = models.CharField(max_length=128, unique=True, db_index=True)
     price = models.PositiveIntegerField()
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES)
-    length = models.DurationField()
+    duration = models.DurationField()
+    
+    base_form_class = ServiceAdminForm
     
     class Meta:
         db_table = 'service'
@@ -115,8 +119,8 @@ class Schedule(models.Model):
     location = models.ForeignKey(Location, on_delete=models.CASCADE)
     worker = models.ForeignKey(Worker, on_delete=models.CASCADE, db_index=True)
     day_of_week = models.SmallIntegerField(choices=DAYS_OF_WEEK_CHOICES, db_index=True)
-    _start_time = models.TimeField(verbose_name='start time')
-    _end_time = models.TimeField(verbose_name='end time')
+    _start_time = models.TimeField(verbose_name='start time', name='start_time')
+    _end_time = models.TimeField(verbose_name='end time', name='end_time')
     
     base_form_class = ScheduleAdminForm
 
@@ -167,8 +171,8 @@ class Schedule(models.Model):
         schedule_for_day = Schedule.objects.filter(
             location=location,
             day_of_week=day_of_week,
-            _start_time__lte=end_time,
-            _end_time__gte=start_time
+            start_time__lte=end_time,
+            end_time__gte=start_time
         )
         return not bool(schedule_for_day)
 
@@ -190,7 +194,12 @@ class Appointment(models.Model):
         ordering = ['-scheduled_for']
     
     def __str__(self):
-        return f'{self.client} appointed to {self.worker} on {self.scheduled_for} for {self.service} service length.'
+        return f'{self.client} appointed to {self.worker} on {self.scheduled_for} for {self.service} service duration.'
+    
+    def get_service_endtime(self):
+        service_end = (datetime.combine(date.min, self.scheduled_for.time())
+                       + self.service.duration)
+        return service_end.time()
     
     @staticmethod
     def _has_free_place(worker, scheduled_for, service):
@@ -203,10 +212,9 @@ class Appointment(models.Model):
         
         for appointment in appointments:
             current_service_start = appointment.scheduled_for.time()
-            current_service_end = (datetime.combine(date.min, appointment.scheduled_for.time())
-                                   + appointment.service.length).time()
+            current_service_end = appointment.get_service_endtime()
             given_service_end = (datetime.combine(date.min, scheduled_for.time())
-                                 + service.length).time()
+                                 + service.duration).time()
             
             # Checking if given appointment placed inside other existing appointment
             if (current_service_start <= scheduled_for.time() <= current_service_end or
@@ -229,7 +237,7 @@ class Appointment(models.Model):
         This method doesn't check existing appointments.
         """
         schedules = Schedule.objects.filter(worker=worker, day_of_week=scheduled_for.weekday())
-        service_end = datetime.combine(date.min, scheduled_for.time()) + service.length
+        service_end = datetime.combine(date.min, scheduled_for.time()) + service.duration
         
         for schedule in schedules:
             if (schedule.start_time <= scheduled_for.time() <= schedule.end_time and
@@ -245,6 +253,9 @@ class Appointment(models.Model):
         :returns: True if appointment is avaliable, else False.
         """
         if not Appointment._is_in_schedule(worker, scheduled_for, service):
-            return False
+            raise ValueError("Given date and/or time not in worker's schedule.")
+
+        if not Appointment._has_free_place(worker, scheduled_for, service):
+            raise ValueError('Given date and/or time not free.')
         
-        return Appointment._has_free_place(worker, scheduled_for, service)
+        return True

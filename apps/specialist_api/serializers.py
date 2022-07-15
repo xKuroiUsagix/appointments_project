@@ -56,10 +56,11 @@ class WorkerSerializer(ModelSerializer):
 
 
 class AppointmentSerializer(ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Appointment
-        fields = ['worker', 'client', 'scheduled_for', 'service']
+        fields = ['id', 'worker', 'client', 'scheduled_for', 'service']
     
     def validate(self, data):
         data_copy = data.copy()
@@ -76,10 +77,12 @@ class AppointmentSerializer(ModelSerializer):
         if data_copy['client'].id == worker_profile_id:
             raise serializers.ValidationError("You can't make an appointment to yourself!")
         
-        if (not Appointment.is_apoointment_avaliable(data_copy['worker'],
-                                                     data_copy['scheduled_for'],
-                                                     data_copy['service'])):
-            raise serializers.ValidationError('An appointment is not avaliable at that date and/or time.')
+        try:
+            Appointment.is_apoointment_avaliable(data_copy['worker'],
+                                                 data_copy['scheduled_for'],
+                                                 data_copy['service'])
+        except ValueError as e:
+            raise serializers.ValidationError(e.args)
         
         return data_copy
     

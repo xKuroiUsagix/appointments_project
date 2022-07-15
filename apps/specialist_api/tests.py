@@ -1,8 +1,7 @@
 import calendar
-from datetime import timedelta, time
+from datetime import timedelta, time, datetime
 
-from django.test import TestCase
-from django.utils import timezone
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 
 from .models import (
@@ -120,12 +119,12 @@ class AppointmentModelTests(TestCase):
         
         self.worker = Worker.objects.create(profile=worker_user)
         
-        service_length = timedelta(minutes=40)
+        service_duration = timedelta(minutes=40)
         self.service = Service.objects.create(
             name='service_name',
             price=120,
             currency='USD',
-            length=service_length
+            duration=service_duration
         )
         self.worker.services.add(self.service)
         
@@ -151,9 +150,9 @@ class AppointmentModelTests(TestCase):
         year = 2022
         month = 7
         day = 4
-        
-        time_inside_schedule = timezone.datetime(year, month, day, self.start_time.hour)
-        time_outside_schedule = timezone.datetime(year, month, day, self.start_time.hour - 1)
+
+        time_inside_schedule = datetime(year, month, day, self.start_time.hour)
+        time_outside_schedule = datetime(year, month, day, self.start_time.hour - 1)
 
         self.assertIs(
             Appointment.is_apoointment_avaliable(
@@ -163,14 +162,12 @@ class AppointmentModelTests(TestCase):
             ),
             True
         )
-        self.assertIs(
+        with self.assertRaises(ValueError):
             Appointment.is_apoointment_avaliable(
                 worker=self.worker,
                 service=self.service,
                 scheduled_for=time_outside_schedule
-            ),
-            False
-        )
+            )
         
         # testing when there is appointment already
         Appointment.objects.create(
@@ -180,13 +177,9 @@ class AppointmentModelTests(TestCase):
             scheduled_for=time_inside_schedule
         )
         
-        self.assertIs(
+        with self.assertRaises(ValueError):
             Appointment.is_apoointment_avaliable(
                 worker=self.worker,
                 service=self.service,
                 scheduled_for=time_inside_schedule
-            ),
-            False
-        )
-        
-    
+            )

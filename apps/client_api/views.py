@@ -67,11 +67,10 @@ class WorkerListAPIView(APIView):
         """
         DATE_FORMAT = '%d-%m-%Y'
         
-        filter_date =  self.request.query_params.get('date')
         filtered_queryset = queryset
-        
-        weekday = datetime.strptime(filter_date, DATE_FORMAT).weekday() if filter_date else None
+        filter_date =  self.request.query_params.get('date')
         proffession = self.request.query_params.get('proffession')
+        weekday = datetime.strptime(filter_date, DATE_FORMAT).weekday() if filter_date else None
         
         if (weekday is None) and (proffession is None):
             return queryset
@@ -115,6 +114,7 @@ class AppointmentCreateAPIView(APIView):
         }
         
         data = request.data.copy()
+        data['worker'] = worker_id
         data['client'] = request.user.id
         data['scheduled_for'] = datetime.strptime(data['scheduled_for'], DATETIME_FORMAT)
         

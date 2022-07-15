@@ -11,6 +11,10 @@ from .models import Appointment, Worker
 
 
 class AppointmentListAPIVIew(APIView):
+    """
+    get:
+    Returns a list of all appointments for specific worker
+    """
     permission_classes = [IsWorkerOrAdmin]
     model = Appointment
     serializer_class = AppointmentSerializer
@@ -25,7 +29,7 @@ class AppointmentListAPIVIew(APIView):
         serializer = self.serializer_class(queryset, many=True)
         
         for item, obj in zip(serializer.data, queryset):
-            item['end_time'] = obj.get_service_endtime().time()
+            item['end_time'] = obj.get_service_endtime()
         
         return Response(serializer.data)
     
@@ -34,6 +38,14 @@ class AppointmentListAPIVIew(APIView):
         return self.model.objects.filter(worker=worker)
     
     def filter_queryset(self, queryset):
+        """
+        Returns new queryset based on given filter params.
+        
+        All possible params:
+            - specific_date (date): a date in format `dd-mm-yyyy`
+            - lower_date (date): a bottom bound of date filter
+            - upper_date (date): a top bound of date filter
+        """
         DATE_FORMAT = '%d-%m-%Y'
         
         specific_date = self.request.query_params.get('specific_date')
